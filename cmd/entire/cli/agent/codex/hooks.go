@@ -54,7 +54,10 @@ func (c *CodexAgent) InstallHooks(ctx context.Context, localDev bool, force bool
 		rawHooks = make(map[string]json.RawMessage)
 	}
 
-	// Parse event types we manage
+	// Parse event types we manage. Codex keys hooks.json by PascalCase event name
+	// (its own test fixtures do the same), even though HookEventName serializes
+	// snake_case elsewhere in its protocol — following that would install hooks that
+	// never fire.
 	var sessionStart, userPromptSubmit, stop, postToolUse, subagentStart, subagentStop []MatcherGroup
 	if err := parseHookType(rawHooks, "SessionStart", &sessionStart); err != nil {
 		return 0, err
@@ -68,8 +71,6 @@ func (c *CodexAgent) InstallHooks(ctx context.Context, localDev bool, force bool
 	if err := parseHookType(rawHooks, "PostToolUse", &postToolUse); err != nil {
 		return 0, err
 	}
-	// Codex keys hooks.json by PascalCase event name (its own fixtures do the same),
-	// even though HookEventName serializes snake_case elsewhere in its protocol.
 	if err := parseHookType(rawHooks, "SubagentStart", &subagentStart); err != nil {
 		return 0, err
 	}
@@ -225,11 +226,19 @@ func (c *CodexAgent) UninstallHooks(ctx context.Context) error {
 	if err := parseHookType(rawHooks, "PostToolUse", &postToolUse); err != nil {
 		return err
 	}
+	if err := parseHookType(rawHooks, "SubagentStart", &subagentStart); err != nil {
+		return err
+	}
+	if err := parseHookType(rawHooks, "SubagentStop", &subagentStop); err != nil {
+		return err
+	}
 
 	sessionStart = removeEntireHooks(sessionStart)
 	userPromptSubmit = removeEntireHooks(userPromptSubmit)
 	stop = removeEntireHooks(stop)
 	postToolUse = removeEntireHooks(postToolUse)
+	subagentStart = removeEntireHooks(subagentStart)
+	subagentStop = removeEntireHooks(subagentStop)
 
 	marshalHookType(rawHooks, "SessionStart", sessionStart)
 	marshalHookType(rawHooks, "UserPromptSubmit", userPromptSubmit)
@@ -276,15 +285,17 @@ func (c *CodexAgent) AreHooksInstalled(ctx context.Context) bool {
 		return false
 	}
 
-	// Subagent hooks are part of the required set, so a repo enabled before they
-	// existed reports drift and gets them on the next install rather than silently
-	// tracking nothing for Codex subagents.
+	// Deliberately NOT including the subagent hooks. This answers "is Entire wired
+	// up here at all?" — see the contract on agent.HookSupport. Requiring the grown
+	// set here would make a repo enabled before subagent hooks existed report as not
+	// installed, which drops Codex from `entire status`, from DetectPresence, and —
+	// worst — makes `entire agent remove codex` refuse to uninstall the 4 hooks that
+	// are there. "Is what's installed still current?" is a different question, and
+	// MissingEntireHooks in trust.go is the check built for it.
 	return hasEntireHook(hooksFile.Hooks.SessionStart) &&
 		hasEntireHook(hooksFile.Hooks.UserPromptSubmit) &&
 		hasEntireHook(hooksFile.Hooks.Stop) &&
-		hasEntireHook(hooksFile.Hooks.PostToolUse) &&
-		hasEntireHook(hooksFile.Hooks.SubagentStart) &&
-		hasEntireHook(hooksFile.Hooks.SubagentStop)
+		hasEntireHook(hooksFile.Hooks.PostToolUse)
 }
 
 // --- Helpers ---

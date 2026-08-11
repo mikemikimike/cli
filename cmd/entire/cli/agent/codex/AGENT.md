@@ -191,13 +191,9 @@ The `systemMessage` field can be used to display messages to the user via the ag
 - JSONL output: `codex exec --json "<prompt>"` (events to stdout)
 - Relevant env vars: `CODEX_HOME` (config dir override), `OPENAI_API_KEY` (API auth)
 
-## Gaps & Limitations
+## Subagent hooks
 
-- **Hooks are stable as of 0.147** (`codex features list` reports `hooks  stable  true`), so no feature flag is needed. Older builds gated them behind `features.codex_hooks`; the e2e harness still writes `[features] hooks = true`, which is harmless on current builds.
-- **No SessionEnd hook:** Codex does not fire a hook when a session is completely terminated. The `Stop` hook fires at end-of-turn, not end-of-session. This is similar to some other agents — the framework handles this gracefully.
-- **PreToolUse is shell-only:** Currently only fires for `Bash` tool (direct shell execution). MCP tools, stdin streaming, and other tool types are not yet hooked. PostToolUse is in review.
-- **Transcript may be null:** In `--ephemeral` mode, `transcript_path` is null. The integration should handle this gracefully.
-- **Subagent hooks exist** (`SubagentStart` / `SubagentStop`, schemas at
+Codex fires `SubagentStart` / `SubagentStop` (`SubagentStart` / `SubagentStop`, schemas at
   `codex-rs/hooks/schema/generated/subagent-{start,stop}.command.input.schema.json`),
   and `multi_agent` is stable/true. Entire wires both. Two identity details are the
   opposite of what the names suggest:
@@ -213,6 +209,15 @@ The `systemMessage` field can be used to display messages to the user via the ag
   `Event.SubagentTranscriptPath`, so it never guesses a layout for Codex. Only
   thread-spawned subagents fire these hooks; internal/synthetic ones expose no
   user-configured lifecycle hooks.
+
+## Gaps & Limitations
+
+- **Hooks are stable as of 0.147** (`codex features list` reports `hooks  stable  true`), so no feature flag is needed. Older builds gated them behind `features.codex_hooks`; the e2e harness still writes `[features] hooks = true`, which is harmless on current builds.
+- **No SessionEnd hook:** Codex does not fire a hook when a session is completely terminated. The `Stop` hook fires at end-of-turn, not end-of-session. This is similar to some other agents — the framework handles this gracefully.
+- **PreToolUse is shell-only:** Currently only fires for `Bash` tool (direct shell execution). MCP tools, stdin streaming, and other tool types are not yet hooked. PostToolUse is in review.
+- **Transcript may be null:** In `--ephemeral` mode, `transcript_path` is null. The integration should handle this gracefully.
+- **Subagent hooks:** supported and wired — see "Subagent hooks" above.
+
 - **Hook response protocol differs from Claude Code:** Codex uses `systemMessage` (same field name) but also supports `hookSpecificOutput` with `additionalContext` for injecting context into the model. For Entire's purposes, `systemMessage` is sufficient.
 
 ## Captured Payloads
