@@ -27,7 +27,7 @@ func TestInstallHooks_CreatesHooksJSONOnly(t *testing.T) {
 	ag := &CodexAgent{}
 	count, err := ag.InstallHooks(context.Background(), false, false)
 	require.NoError(t, err)
-	require.Equal(t, 4, count) // SessionStart, UserPromptSubmit, Stop, PostToolUse
+	require.Equal(t, 6, count) // SessionStart, UserPromptSubmit, Stop, PostToolUse, SubagentStart, SubagentStop
 
 	// Verify hooks.json was created in the repo
 	hooksPath := filepath.Join(tempDir, ".codex", HooksFileName)
@@ -58,7 +58,7 @@ func TestInstallHooks_WindowsWrapperProbeSuccessKeepsWrappedCommands(t *testing.
 	ag := &CodexAgent{}
 	count, err := ag.InstallHooks(context.Background(), false, false)
 	require.NoError(t, err)
-	require.Equal(t, 4, count)
+	require.Equal(t, 6, count)
 
 	hooksPath := filepath.Join(tempDir, ".codex", HooksFileName)
 	data, err := os.ReadFile(hooksPath)
@@ -80,7 +80,7 @@ func TestInstallHooks_WindowsWrapperProbeFailureUsesWindowsCommands(t *testing.T
 	ag := &CodexAgent{}
 	count, err := ag.InstallHooks(context.Background(), false, false)
 	require.NoError(t, err)
-	require.Equal(t, 4, count)
+	require.Equal(t, 6, count)
 
 	hooksPath := filepath.Join(tempDir, ".codex", HooksFileName)
 	data, err := os.ReadFile(hooksPath)
@@ -108,12 +108,12 @@ func TestInstallHooks_WindowsWrapperProbeFailureMigratesToWindowsCommands(t *tes
 	ag := &CodexAgent{}
 	count, err := ag.InstallHooks(context.Background(), false, false)
 	require.NoError(t, err)
-	require.Equal(t, 4, count)
+	require.Equal(t, 6, count)
 
 	wrapperWorks = false
 	count, err = ag.InstallHooks(context.Background(), false, false)
 	require.NoError(t, err)
-	require.Equal(t, 4, count)
+	require.Equal(t, 6, count)
 
 	hooksPath := filepath.Join(tempDir, ".codex", HooksFileName)
 	data, err := os.ReadFile(hooksPath)
@@ -138,7 +138,7 @@ func TestInstallHooks_Idempotent(t *testing.T) {
 
 	count1, err := ag.InstallHooks(context.Background(), false, false)
 	require.NoError(t, err)
-	require.Equal(t, 4, count1)
+	require.Equal(t, 6, count1)
 
 	count2, err := ag.InstallHooks(context.Background(), false, false)
 	require.NoError(t, err)
@@ -151,7 +151,7 @@ func TestInstallHooks_LocalDev(t *testing.T) {
 	ag := &CodexAgent{}
 	count, err := ag.InstallHooks(context.Background(), true, false)
 	require.NoError(t, err)
-	require.Equal(t, 4, count)
+	require.Equal(t, 6, count)
 
 	hooksPath := filepath.Join(tempDir, ".codex", HooksFileName)
 	data, err := os.ReadFile(hooksPath)
@@ -170,7 +170,7 @@ func TestInstallHooks_Force(t *testing.T) {
 
 	count, err := ag.InstallHooks(context.Background(), false, true)
 	require.NoError(t, err)
-	require.Equal(t, 4, count)
+	require.Equal(t, 6, count)
 }
 
 func TestUninstallHooks(t *testing.T) {

@@ -193,11 +193,26 @@ The `systemMessage` field can be used to display messages to the user via the ag
 
 ## Gaps & Limitations
 
-- **Hooks require feature flag:** The `codex_hooks` feature is `default_enabled: false` (stage: UnderDevelopment). It must be enabled via `--enable codex_hooks` CLI flag, or `features.codex_hooks = true` in `config.toml`, or `-c features.codex_hooks=true`. Without this, hooks.json is ignored entirely.
+- **Hooks are stable as of 0.147** (`codex features list` reports `hooks  stable  true`), so no feature flag is needed. Older builds gated them behind `features.codex_hooks`; the e2e harness still writes `[features] hooks = true`, which is harmless on current builds.
 - **No SessionEnd hook:** Codex does not fire a hook when a session is completely terminated. The `Stop` hook fires at end-of-turn, not end-of-session. This is similar to some other agents — the framework handles this gracefully.
 - **PreToolUse is shell-only:** Currently only fires for `Bash` tool (direct shell execution). MCP tools, stdin streaming, and other tool types are not yet hooked. PostToolUse is in review.
 - **Transcript may be null:** In `--ephemeral` mode, `transcript_path` is null. The integration should handle this gracefully.
-- **No subagent hooks:** No PreTask/PostTask equivalent for subagent spawning.
+- **Subagent hooks exist** (`SubagentStart` / `SubagentStop`, schemas at
+  `codex-rs/hooks/schema/generated/subagent-{start,stop}.command.input.schema.json`),
+  and `multi_agent` is stable/true. Entire wires both. Two identity details are the
+  opposite of what the names suggest:
+  - `session_id` is shared by the root thread and all descendants — i.e. the *user's*
+    session — so it maps straight to Entire's SessionID.
+  - `agent_id` is the subagent thread's own id. Codex sends no `tool_use_id`, so
+    `agent_id` doubles as Entire's ToolUseID: it is the only value correlating a
+    start with its stop, and Entire keys pre-task state and the task metadata
+    directory on it.
+
+  `SubagentStop` carries two transcripts: `transcript_path` is the *parent* rollout,
+  `agent_transcript_path` the subagent's own. Entire forwards the latter as
+  `Event.SubagentTranscriptPath`, so it never guesses a layout for Codex. Only
+  thread-spawned subagents fire these hooks; internal/synthetic ones expose no
+  user-configured lifecycle hooks.
 - **Hook response protocol differs from Claude Code:** Codex uses `systemMessage` (same field name) but also supports `hookSpecificOutput` with `additionalContext` for injecting context into the model. For Entire's purposes, `systemMessage` is sufficient.
 
 ## Captured Payloads

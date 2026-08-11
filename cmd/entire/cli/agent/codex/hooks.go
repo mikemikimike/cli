@@ -55,7 +55,7 @@ func (c *CodexAgent) InstallHooks(ctx context.Context, localDev bool, force bool
 	}
 
 	// Parse event types we manage
-	var sessionStart, userPromptSubmit, stop, postToolUse []MatcherGroup
+	var sessionStart, userPromptSubmit, stop, postToolUse, subagentStart, subagentStop []MatcherGroup
 	if err := parseHookType(rawHooks, "SessionStart", &sessionStart); err != nil {
 		return 0, err
 	}
@@ -68,12 +68,22 @@ func (c *CodexAgent) InstallHooks(ctx context.Context, localDev bool, force bool
 	if err := parseHookType(rawHooks, "PostToolUse", &postToolUse); err != nil {
 		return 0, err
 	}
+	// Codex keys hooks.json by PascalCase event name (its own fixtures do the same),
+	// even though HookEventName serializes snake_case elsewhere in its protocol.
+	if err := parseHookType(rawHooks, "SubagentStart", &subagentStart); err != nil {
+		return 0, err
+	}
+	if err := parseHookType(rawHooks, "SubagentStop", &subagentStop); err != nil {
+		return 0, err
+	}
 
 	if force {
 		sessionStart = removeEntireHooks(sessionStart)
 		userPromptSubmit = removeEntireHooks(userPromptSubmit)
 		stop = removeEntireHooks(stop)
 		postToolUse = removeEntireHooks(postToolUse)
+		subagentStart = removeEntireHooks(subagentStart)
+		subagentStop = removeEntireHooks(subagentStop)
 	}
 
 	// Build hook commands
@@ -91,10 +101,14 @@ func (c *CodexAgent) InstallHooks(ctx context.Context, localDev bool, force bool
 	userPromptSubmitCmd := cmdPrefix + "user-prompt-submit"
 	stopCmd := cmdPrefix + "stop"
 	postToolUseCmd := cmdPrefix + "post-tool-use"
+	subagentStartCmd := cmdPrefix + "subagent-start"
+	subagentStopCmd := cmdPrefix + "subagent-stop"
 	if !localDev {
 		userPromptSubmitCmd = agent.WrapProductionSilentHookCommandForOS(userPromptSubmitCmd, useWindowsProductionHooks)
 		stopCmd = agent.WrapProductionSilentHookCommandForOS(stopCmd, useWindowsProductionHooks)
 		postToolUseCmd = agent.WrapProductionSilentHookCommandForOS(postToolUseCmd, useWindowsProductionHooks)
+		subagentStartCmd = agent.WrapProductionSilentHookCommandForOS(subagentStartCmd, useWindowsProductionHooks)
+		subagentStopCmd = agent.WrapProductionSilentHookCommandForOS(subagentStopCmd, useWindowsProductionHooks)
 	}
 
 	count := 0
@@ -115,6 +129,14 @@ func (c *CodexAgent) InstallHooks(ctx context.Context, localDev bool, force bool
 		postToolUse = updated
 		count++
 	}
+	if updated, changed := syncHookCommand(subagentStart, subagentStartCmd); changed {
+		subagentStart = updated
+		count++
+	}
+	if updated, changed := syncHookCommand(subagentStop, subagentStopCmd); changed {
+		subagentStop = updated
+		count++
+	}
 
 	if count == 0 {
 		return 0, nil
@@ -125,6 +147,8 @@ func (c *CodexAgent) InstallHooks(ctx context.Context, localDev bool, force bool
 	marshalHookType(rawHooks, "UserPromptSubmit", userPromptSubmit)
 	marshalHookType(rawHooks, "Stop", stop)
 	marshalHookType(rawHooks, "PostToolUse", postToolUse)
+	marshalHookType(rawHooks, "SubagentStart", subagentStart)
+	marshalHookType(rawHooks, "SubagentStop", subagentStop)
 
 	// Preserve existing top-level keys (e.g., $schema) by reusing the parsed file
 	topLevel := make(map[string]json.RawMessage)
@@ -188,7 +212,7 @@ func (c *CodexAgent) UninstallHooks(ctx context.Context) error {
 		return nil
 	}
 
-	var sessionStart, userPromptSubmit, stop, postToolUse []MatcherGroup
+	var sessionStart, userPromptSubmit, stop, postToolUse, subagentStart, subagentStop []MatcherGroup
 	if err := parseHookType(rawHooks, "SessionStart", &sessionStart); err != nil {
 		return err
 	}
@@ -211,6 +235,8 @@ func (c *CodexAgent) UninstallHooks(ctx context.Context) error {
 	marshalHookType(rawHooks, "UserPromptSubmit", userPromptSubmit)
 	marshalHookType(rawHooks, "Stop", stop)
 	marshalHookType(rawHooks, "PostToolUse", postToolUse)
+	marshalHookType(rawHooks, "SubagentStart", subagentStart)
+	marshalHookType(rawHooks, "SubagentStop", subagentStop)
 
 	if len(rawHooks) > 0 {
 		hooksJSON, err := jsonutil.MarshalWithNoHTMLEscape(rawHooks)
@@ -250,10 +276,15 @@ func (c *CodexAgent) AreHooksInstalled(ctx context.Context) bool {
 		return false
 	}
 
+	// Subagent hooks are part of the required set, so a repo enabled before they
+	// existed reports drift and gets them on the next install rather than silently
+	// tracking nothing for Codex subagents.
 	return hasEntireHook(hooksFile.Hooks.SessionStart) &&
 		hasEntireHook(hooksFile.Hooks.UserPromptSubmit) &&
 		hasEntireHook(hooksFile.Hooks.Stop) &&
-		hasEntireHook(hooksFile.Hooks.PostToolUse)
+		hasEntireHook(hooksFile.Hooks.PostToolUse) &&
+		hasEntireHook(hooksFile.Hooks.SubagentStart) &&
+		hasEntireHook(hooksFile.Hooks.SubagentStop)
 }
 
 // --- Helpers ---
