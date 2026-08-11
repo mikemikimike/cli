@@ -1315,6 +1315,19 @@ func IsSetUpAny(ctx context.Context) bool {
 	return err == nil
 }
 
+// IsSetUpAtRoot reports whether Entire has been set up in the repository
+// whose worktree root is the given directory. It mirrors IsSetUp/IsSetUpAny
+// Lstat semantics against an explicit root instead of the process cwd:
+// IsSetUpAny resolves through paths.AbsPath → the process-cwd WorktreeRoot,
+// so a hook process checking a FOREIGN repo's enablement cannot use it.
+func IsSetUpAtRoot(root string) bool {
+	if _, err := os.Lstat(filepath.Join(root, EntireSettingsFile)); err == nil {
+		return true
+	}
+	_, err := os.Lstat(filepath.Join(root, EntireSettingsLocalFile))
+	return err == nil
+}
+
 // IsSetUpAndEnabled returns true if Entire is both set up and enabled.
 // "Set up" spans either scope — .entire/settings.json OR
 // .entire/settings.local.json — so it must check IsSetUpAny, not IsSetUp.
