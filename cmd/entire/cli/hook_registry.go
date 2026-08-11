@@ -102,9 +102,12 @@ func getHookType(hookName string) string {
 // since it doesn't go through PersistentPreRunE). Built-in agent subcommands pass false since
 // their parent command's PersistentPreRunE already handles logging.
 func executeAgentHook(cmd *cobra.Command, agentName types.AgentName, hookName string, initLogging bool) error {
-	// Skip silently if not in a git repository - hooks shouldn't prevent the agent from working
 	worktreeRoot, err := paths.WorktreeRoot(cmd.Context())
 	if err != nil {
+		// No repo at cwd: capture is impossible, but the session's evidence
+		// may name repos elsewhere (parent-dir launches, #1098). Record it
+		// best-effort and still exit 0 so the agent is never blocked.
+		recordNoRepoEvidence(cmd.Context(), agentName, hookName, cmd.InOrStdin())
 		return nil
 	}
 
