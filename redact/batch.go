@@ -121,7 +121,7 @@ func collectLeaves(in NamedBlob, add func(string)) {
 		if _, err := jsonlContentImpl(string(in.Content), func(v string) string {
 			add(v)
 			return v
-		}); err == nil {
+		}, concurrencyUnsafeRedactor); err == nil {
 			return
 		}
 		// JSONL parse failed — fall through to whole-content.
@@ -139,7 +139,7 @@ func applyToBlob(in NamedBlob, spansByInput map[string][]Span, cfg *OPFConfig) [
 		return applyRegions(v, regions)
 	}
 	if isJSONLikeName(in.Name) {
-		if redacted, err := jsonlContentImpl(string(in.Content), applier); err == nil {
+		if redacted, err := jsonlContentImpl(string(in.Content), applier, concurrencySafeRedactor); err == nil {
 			return []byte(redacted)
 		}
 	}
@@ -153,7 +153,7 @@ func applyRegexLayersToBlobs(inputs []NamedBlob) [][]byte {
 	out := make([][]byte, len(inputs))
 	for i, in := range inputs {
 		if isJSONLikeName(in.Name) {
-			if redacted, err := jsonlContentImpl(string(in.Content), String); err == nil {
+			if redacted, err := jsonlContentImpl(string(in.Content), String, concurrencySafeRedactor); err == nil {
 				out[i] = []byte(redacted)
 				continue
 			}
@@ -195,7 +195,7 @@ func SumProseLeafBytes(inputs []NamedBlob) int {
 					total += len(v)
 				}
 				return v
-			}); err == nil {
+			}, concurrencyUnsafeRedactor); err == nil {
 				continue
 			}
 			// JSON parse failed — fall through to whole-content (matches
